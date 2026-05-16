@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>ADLClient</members>
+        <members>ADLConsoleController</members>
+        <members>ADLS3Uploader</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>agentforceDataLibraries</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <types>
+        <members>ADL_Admin_Console</members>
+        <name>FlexiPage</name>
+    </types>
+    <version>66.0</version>
+</Package>

@@ -1,0 +1,555 @@
+<template>
+    <div class="adl-shell">
+        <header class="topbar">
+            <div class="brand-block">
+                <div class="brand-mark">
+                    <lightning-icon icon-name="utility:database" size="small"></lightning-icon>
+                </div>
+                <div>
+                    <div class="brand-title">Agentforce Data Libraries</div>
+                    <div class="brand-subtitle">Admin Console</div>
+                </div>
+            </div>
+
+            <nav class="nav-tabs" aria-label="Views">
+                <button class={homeTabClass} data-view="home" onclick={handleViewChange}>Home</button>
+                <button class={librariesTabClass} data-view="libraries" onclick={handleViewChange}>Libraries</button>
+                <button class={filesTabClass} data-view="files" onclick={handleViewChange}>Files</button>
+            </nav>
+
+            <div class="topbar-actions">
+                <button class="ghost-button" onclick={refreshData} disabled={isBusy}>
+                    <lightning-icon icon-name="utility:refresh" size="xx-small"></lightning-icon>
+                    Refresh
+                </button>
+                <button class="primary-button" onclick={openCreateModal}>
+                    <lightning-icon icon-name="utility:add" size="xx-small"></lightning-icon>
+                    New library
+                </button>
+            </div>
+        </header>
+
+        <main class="page">
+            <template if:true={errorMessage}>
+                <section class="alert error">
+                    <lightning-icon icon-name="utility:error" size="small"></lightning-icon>
+                    <div>{errorMessage}</div>
+                    <button class="icon-button" onclick={clearError} title="Dismiss">
+                        <lightning-icon icon-name="utility:close" size="xx-small"></lightning-icon>
+                    </button>
+                </section>
+            </template>
+
+            <template if:true={isBusy}>
+                <div class="loading-strip"><div></div></div>
+            </template>
+
+            <!-- HOME -->
+            <template if:true={isHomeView}>
+                <section class="hero">
+                    <div>
+                        <div class="crumbs">Home</div>
+                        <h1>Good {timeGreeting}, {userFirstName}</h1>
+                        <p>{homeSubtitle}</p>
+                    </div>
+                    <div class="hero-badge">
+                        <span class="pulse-dot"></span>
+                        Live status from getStatus()
+                    </div>
+                </section>
+
+                <section class="metric-grid">
+                    <article class="metric-card">
+                        <span>Libraries</span>
+                        <strong>{metricLibraries}</strong>
+                        <small>{metricLibrarySub}</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Files indexed</span>
+                        <strong>{metricFiles}</strong>
+                        <small>Across all libraries</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Storage used</span>
+                        <strong>{metricStorage}</strong>
+                        <small>{metricAverageSize}</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Quota used</span>
+                        <strong>{metricQuota}</strong>
+                        <small>1,000 files per library</small>
+                    </article>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-head">
+                        <h2>
+                            <lightning-icon icon-name="utility:database" size="x-small"></lightning-icon>
+                            Your libraries
+                        </h2>
+                        <button class="link-button" data-view="libraries" onclick={handleViewChange}>View all →</button>
+                    </div>
+
+                    <template if:true={hasLibraries}>
+                        <div class="library-grid">
+                            <template for:each={homeLibraries} for:item="lib">
+                                <article key={lib.id} class="library-card" data-id={lib.id} onclick={selectLibrary}>
+                                    <div class="library-top">
+                                        <div>
+                                            <h3>{lib.name}</h3>
+                                            <code>{lib.id}</code>
+                                        </div>
+                                        <span class={lib.statusPillClass}>
+                                            <span class={lib.statusDotClass}></span>
+                                            {lib.statusLabel}
+                                        </span>
+                                    </div>
+                                    <p>{lib.descriptionDisplay}</p>
+                                    <div class="library-meta">
+                                        <span>
+                                            <lightning-icon icon-name="utility:file" size="xx-small"></lightning-icon>
+                                            {lib.fileCount} / 1000
+                                        </span>
+                                        <span>
+                                            <lightning-icon icon-name="utility:database" size="xx-small"></lightning-icon>
+                                            {lib.totalSizeLabel}
+                                        </span>
+                                        <span>
+                                            <lightning-icon icon-name="utility:clock" size="xx-small"></lightning-icon>
+                                            {lib.updatedLabel}
+                                        </span>
+                                    </div>
+                                </article>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template if:false={hasLibraries}>
+                        <div class="empty-state">
+                            <lightning-icon icon-name="utility:database" size="medium"></lightning-icon>
+                            <h3>No libraries yet</h3>
+                            <p>Create your first SFDRIVE data library to start grounding Agentforce.</p>
+                            <button class="primary-button" onclick={openCreateModal}>Create library</button>
+                        </div>
+                    </template>
+                </section>
+            </template>
+
+            <!-- LIBRARIES -->
+            <template if:true={isLibrariesView}>
+                <section class="page-head">
+                    <div>
+                        <div class="crumbs">
+                            <button class="crumb-link" data-view="home" onclick={handleViewChange}>Home</button>
+                            <span>›</span> Libraries
+                        </div>
+                        <h1>Libraries</h1>
+                        <p>{librariesSubtitle}</p>
+                    </div>
+                    <button class="primary-button" onclick={openCreateModal}>
+                        <lightning-icon icon-name="utility:add" size="xx-small"></lightning-icon>
+                        New library
+                    </button>
+                </section>
+
+                <section class="controls">
+                    <div class="search-wrap">
+                        <lightning-icon icon-name="utility:search" size="xx-small"></lightning-icon>
+                        <input type="search" value={librarySearch} oninput={handleLibrarySearch}
+                            placeholder="Search libraries by name, developer name, or id…" />
+                    </div>
+                    <select value={statusFilter} onchange={handleStatusFilter}>
+                        <option value="">All statuses</option>
+                        <option value="READY">Ready</option>
+                        <option value="IN_PROGRESS">In progress</option>
+                        <option value="FAILED">Failed</option>
+                        <option value="NO_STATUS">No status</option>
+                    </select>
+                </section>
+
+                <template if:true={filteredLibraries.length}>
+                    <div class="library-grid">
+                        <template for:each={filteredLibraries} for:item="lib">
+                            <article key={lib.id} class="library-card large" data-id={lib.id} onclick={selectLibrary}>
+                                <div class="library-top">
+                                    <div>
+                                        <h3>{lib.name}</h3>
+                                        <code>{lib.devName}</code>
+                                    </div>
+                                    <span class={lib.statusPillClass}>
+                                        <span class={lib.statusDotClass}></span>
+                                        {lib.statusLabel}
+                                    </span>
+                                </div>
+                                <p>{lib.descriptionDisplay}</p>
+                                <div class="quota-bar" title={lib.quotaLabel}>
+                                    <div style={lib.quotaStyle}></div>
+                                </div>
+                                <div class="library-meta">
+                                    <span>{lib.sourceType}</span>
+                                    <span>{lib.fileCount} files</span>
+                                    <span>{lib.totalSizeLabel}</span>
+                                    <span>{lib.updatedLabel}</span>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </template>
+
+                <template if:false={filteredLibraries.length}>
+                    <div class="empty-state carded">
+                        <lightning-icon icon-name="utility:search" size="medium"></lightning-icon>
+                        <h3>No matching libraries</h3>
+                        <p>Try a different search or status filter.</p>
+                    </div>
+                </template>
+            </template>
+
+            <!-- DETAIL -->
+            <template if:true={isDetailView}>
+                <section class="page-head detail-head">
+                    <div>
+                        <div class="crumbs">
+                            <button class="crumb-link" data-view="libraries" onclick={handleViewChange}>Libraries</button>
+                            <span>›</span> {selectedLibrary.name}
+                        </div>
+                        <h1>{selectedLibrary.name}</h1>
+                        <p>{selectedLibrary.sourceType} · {selectedLibrary.devName} · {selectedLibrary.id}</p>
+                    </div>
+                    <div class="detail-actions">
+                        <span class={selectedLibrary.statusPillClass}>
+                            <span class={selectedLibrary.statusDotClass}></span>
+                            {selectedLibrary.statusLabel}
+                        </span>
+                        <button class="primary-button" onclick={scrollToUpload}>
+                            <lightning-icon icon-name="utility:upload" size="xx-small"></lightning-icon>
+                            Add files
+                        </button>
+                        <button class="danger-button" onclick={openDeleteModal} title="Delete this library">
+                            <lightning-icon icon-name="utility:delete" size="xx-small"></lightning-icon>
+                            Delete
+                        </button>
+                    </div>
+                </section>
+
+                <section class="metric-grid">
+                    <article class="metric-card">
+                        <span>Files</span>
+                        <strong>{selectedLibrary.fileCount}<small> / 1000</small></strong>
+                        <div class="quota-bar"><div style={selectedLibrary.quotaStyle}></div></div>
+                    </article>
+                    <article class="metric-card">
+                        <span>Total size</span>
+                        <strong>{selectedLibrary.totalSizeLabel}</strong>
+                        <small>{selectedLibrary.largestFileLabel}</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Current stage</span>
+                        <strong class="stage-value">{selectedLibrary.currentStageDisplay}</strong>
+                        <small>Overall: {selectedLibrary.status}</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Last updated</span>
+                        <strong class="stage-value">{selectedLibrary.updatedLabel}</strong>
+                        <small>via getStatus()</small>
+                    </article>
+                </section>
+
+                <section class="detail-grid">
+                    <article class="panel">
+                        <div class="panel-head">
+                            <h2>
+                                <lightning-icon icon-name="utility:flow" size="x-small"></lightning-icon>
+                                Indexing pipeline
+                            </h2>
+                        </div>
+                        <div class="stage-list">
+                            <template for:each={selectedLibrary.stagesVm} for:item="stage">
+                                <div key={stage.key} class="stage-row">
+                                    <span class={stage.dotClass}></span>
+                                    <div>
+                                        <strong>{stage.label}</strong>
+                                        <small>{stage.description}</small>
+                                    </div>
+                                    <em>{stage.timeLabel}</em>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="mini-note">
+                            <lightning-icon icon-name="utility:clock" size="xx-small"></lightning-icon>
+                            Auto-refreshes while this component is open.
+                        </div>
+                    </article>
+
+                    <article class="panel" data-id="uploadPanel">
+                        <div class="panel-head">
+                            <h2>
+                                <lightning-icon icon-name="utility:file" size="x-small"></lightning-icon>
+                                Grounding files
+                                <span class="count-pill">{selectedLibrary.fileCount}</span>
+                            </h2>
+                        </div>
+                        <div class={dropzoneClass} ondragover={handleDragOver} ondragleave={handleDragLeave} ondrop={handleDrop}>
+                            <lightning-icon icon-name="utility:upload" size="small"></lightning-icon>
+                            <strong>Drop PDF, DOCX, DOC, or TXT files here</strong>
+                            <span>or use the picker below</span>
+                            <label class="file-picker-button">
+                                <lightning-icon icon-name="utility:upload" size="xx-small"></lightning-icon>
+                                <span>Choose files</span>
+                                <input type="file" multiple accept=".pdf,.doc,.docx,.txt" onchange={handleFilePicker} />
+                            </label>
+                        </div>
+
+                        <template if:true={pendingFiles.length}>
+                            <div class="pending-upload">
+                                <div>
+                                    <strong>{pendingFileSummary}</strong>
+                                    <span>{pendingSizeSummary}</span>
+                                </div>
+                                <button class="primary-button" onclick={uploadPendingFiles} disabled={isUploading}>
+                                    <lightning-icon icon-name="utility:upload" size="xx-small"></lightning-icon>
+                                    Upload & index
+                                </button>
+                                <button class="ghost-button" onclick={clearPendingFiles} disabled={isUploading}>Clear</button>
+                            </div>
+                        </template>
+
+                        <template if:true={selectedLibrary.filesVm.length}>
+                            <div class="file-table-wrap">
+                                <table class="file-table">
+                                    <thead>
+                                        <tr><th>File</th><th class="right">Size</th><th>Added</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={selectedLibrary.filesVm} for:item="file">
+                                            <tr key={file.key}>
+                                                <td>
+                                                    <div class="file-cell">
+                                                        <span class={file.iconClass}>{file.extLabel}</span>
+                                                        <div>
+                                                            <strong>{file.fileName}</strong>
+                                                            <small>by {file.createdByDisplay}</small>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="right mono">{file.sizeLabel}</td>
+                                                <td>{file.dateLabel}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+
+                        <template if:false={selectedLibrary.filesVm.length}>
+                            <div class="empty-state compact">
+                                <lightning-icon icon-name="utility:file" size="small"></lightning-icon>
+                                <h3>No files yet</h3>
+                                <p>Upload the first files to provision indexing for this library.</p>
+                            </div>
+                        </template>
+                    </article>
+                </section>
+            </template>
+
+            <!-- FILES -->
+            <template if:true={isFilesView}>
+                <section class="page-head">
+                    <div>
+                        <div class="crumbs">
+                            <button class="crumb-link" data-view="home" onclick={handleViewChange}>Home</button>
+                            <span>›</span> All files
+                        </div>
+                        <h1>All files</h1>
+                        <p>{filesSubtitle}</p>
+                    </div>
+                </section>
+
+                <section class="metric-grid">
+                    <article class="metric-card">
+                        <span>Total files</span>
+                        <strong>{metricFiles}</strong>
+                        <small>Across {metricLibraries} libraries</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Storage used</span>
+                        <strong>{metricStorage}</strong>
+                        <small>Sum of fileSize</small>
+                    </article>
+                    <article class="metric-card warning">
+                        <span>Duplicate names</span>
+                        <strong>{duplicateFileNameCount}</strong>
+                        <small>Same filename in 2+ libraries</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Largest file</span>
+                        <strong class="stage-value">{largestFileSize}</strong>
+                        <small>{largestFileName}</small>
+                    </article>
+                </section>
+
+                <section class="controls">
+                    <div class="search-wrap">
+                        <lightning-icon icon-name="utility:search" size="xx-small"></lightning-icon>
+                        <input type="search" value={fileSearch} oninput={handleFileSearch}
+                            placeholder="Search by filename, library, or uploader…" />
+                    </div>
+                    <select value={fileLibraryFilter} onchange={handleFileLibraryFilter}>
+                        <option value="">All libraries</option>
+                        <template for:each={librariesVm} for:item="lib">
+                            <option key={lib.id} value={lib.id}>{lib.name}</option>
+                        </template>
+                    </select>
+                    <select value={fileTypeFilter} onchange={handleFileTypeFilter}>
+                        <option value="">All types</option>
+                        <option value="pdf">PDF</option>
+                        <option value="docx">DOCX</option>
+                        <option value="doc">DOC</option>
+                        <option value="txt">TXT</option>
+                    </select>
+                </section>
+
+                <section class="panel table-panel">
+                    <template if:true={filteredFiles.length}>
+                        <table class="file-table all-files">
+                            <thead>
+                                <tr>
+                                    <th>File</th><th>Library</th><th class="right">Size</th>
+                                    <th>Added</th><th>Uploaded by</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={filteredFiles} for:item="file">
+                                    <tr key={file.key} data-id={file.libraryId} onclick={selectLibrary}>
+                                        <td>
+                                            <div class="file-cell">
+                                                <span class={file.iconClass}>{file.extLabel}</span>
+                                                <div>
+                                                    <strong>{file.fileName}</strong>
+                                                    <template if:true={file.duplicateLabel}>
+                                                        <span class="duplicate-pill">{file.duplicateLabel}</span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class={file.libraryPillClass}>{file.libraryName}</span></td>
+                                        <td class="right mono">{file.sizeLabel}</td>
+                                        <td>{file.dateLabel}</td>
+                                        <td>{file.createdByDisplay}</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+
+                    <template if:false={filteredFiles.length}>
+                        <div class="empty-state">
+                            <lightning-icon icon-name="utility:search" size="medium"></lightning-icon>
+                            <h3>No files match</h3>
+                            <p>Try a different search, library, or file type filter.</p>
+                        </div>
+                    </template>
+                </section>
+            </template>
+
+            <footer class="footer">
+                API v66.0 Beta · SFDRIVE · Powered by ADLClient + ADLS3Uploader
+            </footer>
+        </main>
+    </div>
+
+    <!--
+        Modals live OUTSIDE .adl-shell on purpose. Putting them inside any
+        ancestor that has backdrop-filter, transform, filter, or mix-blend-mode
+        creates a containing block for position: fixed children, which
+        re-anchors them to that ancestor instead of the viewport. By rendering
+        them as siblings of .adl-shell at the top level of <template>, the
+        modals' position: fixed is anchored to the LWC root, which has none of
+        those CSS features.
+    -->
+
+    <template if:true={showCreateModal}>
+        <section class="modal-backdrop" role="presentation" onclick={handleBackdropClick}>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-title">
+                <button class="modal-close" onclick={closeCreateModal} title="Close">
+                    <lightning-icon icon-name="utility:close" size="x-small"></lightning-icon>
+                </button>
+
+                <h2 id="create-title">Create a new library</h2>
+                <p>SFDRIVE is currently selected as the grounding source. Files are added after the library is created.</p>
+
+                <label>
+                    <span>Master label</span>
+                    <input type="text" value={createMasterLabel} maxlength="80"
+                        oninput={handleCreateMasterLabel} placeholder="e.g. North Sea Ops Manuals" />
+                    <small>Max 80 characters</small>
+                </label>
+
+                <label>
+                    <span>Developer name</span>
+                    <input type="text" value={createDeveloperName} maxlength="80"
+                        oninput={handleCreateDeveloperName} placeholder="e.g. North_Sea_Ops_Manuals" />
+                    <small>Must match ^[a-zA-Z][a-zA-Z0-9_]*$</small>
+                </label>
+
+                <label>
+                    <span>Description</span>
+                    <textarea rows="3" maxlength="255" value={createDescription}
+                        oninput={handleCreateDescription} placeholder="What's in this library?"></textarea>
+                    <small>Optional · Max 255 characters</small>
+                </label>
+
+                <label>
+                    <span>Source type</span>
+                    <input type="text" value="SFDRIVE" disabled />
+                    <small>KNOWLEDGE and RETRIEVER are intentionally not exposed here.</small>
+                </label>
+
+                <div class="modal-actions">
+                    <button class="ghost-button" onclick={closeCreateModal}>Cancel</button>
+                    <button class="primary-button" onclick={submitCreateLibrary} disabled={isBusy}>
+                        <lightning-icon icon-name="utility:check" size="xx-small"></lightning-icon>
+                        Create library
+                    </button>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template if:true={showDeleteModal}>
+        <section class="modal-backdrop" role="presentation" onclick={handleDeleteBackdropClick}>
+            <div class="modal modal-danger" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+                <button class="modal-close" onclick={closeDeleteModal} title="Close">
+                    <lightning-icon icon-name="utility:close" size="x-small"></lightning-icon>
+                </button>
+
+                <div class="modal-danger-icon">
+                    <lightning-icon icon-name="utility:warning" size="small"></lightning-icon>
+                </div>
+
+                <h2 id="delete-title">Delete this library?</h2>
+                <p>
+                    This permanently deletes <strong>{selectedLibrary.name}</strong> and tears down
+                    its Data Lake Object, Data Model Object, Search Index, and Retriever. Any
+                    Agentforce assistants grounded on this library will stop returning results.
+                    <strong>This cannot be undone.</strong>
+                </p>
+
+                <label>
+                    <span>Type the library name to confirm</span>
+                    <input type="text" value={deleteConfirmInput} oninput={handleDeleteConfirmInput}
+                        placeholder={selectedLibrary.name} autocomplete="off" spellcheck="false" />
+                    <small>Case-sensitive · must match exactly</small>
+                </label>
+
+                <div class="modal-actions">
+                    <button class="ghost-button" onclick={closeDeleteModal} disabled={isDeleting}>Cancel</button>
+                    <button class="danger-button" onclick={confirmDeleteLibrary} disabled={deleteConfirmDisabled}>
+                        <lightning-icon icon-name="utility:delete" size="xx-small"></lightning-icon>
+                        Delete library
+                    </button>
+                </div>
+            </div>
+        </section>
+    </template>
+</template>
