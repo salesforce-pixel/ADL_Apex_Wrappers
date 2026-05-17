@@ -1,6 +1,6 @@
 # Agentforce Data Libraries Admin Console
 
-A Salesforce Lightning Web Component and Apex solution for managing **Agentforce Data Libraries (ADL)** — the SFDRIVE-backed grounding sources that power Agentforce assistants. Provides an admin-friendly console for creating libraries, uploading files, watching indexing progress, and decommissioning libraries — all on top of a reusable Apex wrapper over the Einstein Data Libraries REST API (v66.0 Beta).
+A Salesforce Lightning Web Component and Apex solution for managing **Agentforce Data Libraries (ADL)** — the SFDRIVE-backed grounding sources that power Agentforce assistants. Provides an admin-friendly console for creating libraries, uploading files, watching indexing progress, and decommissioning libraries — all on top of a reusable Apex wrapper over the Agentforce Data Libraries REST API (v66.0 Beta).
 
 > 📘 **Official API reference:** [Agentforce Data Libraries — Connect REST API](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_adl.htm)
 
