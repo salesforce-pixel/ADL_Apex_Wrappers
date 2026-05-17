@@ -24,12 +24,27 @@
  *   entry above is not matched, add a second Remote Site Setting with that
  *   exact host.
  *
+ *   Note: do NOT route S3 callouts through a Named Credential. The Named
+ *   Credential for ADL (`ADL_NC`) is for Salesforce-to-Salesforce auth and
+ *   would inject an Authorization header that invalidates the AWS Sig V4
+ *   signature carried in the presigned URL.
+ *
  * Headers: pass through EXACTLY what ADLClient returned in the `headers` map
  * of the UploadUrl. No more, no less. The signature is computed over these
  * headers (see X-Amz-SignedHeaders in the URL); adding extras causes 403
  * SignatureDoesNotMatch.
  *
  * Body: must be raw binary. Use setBodyAsBlob, never setBody (string).
+ *
+ * URL lifetime: presigned URLs are short-lived (~15 minutes). Mint them and
+ * upload in the same Apex transaction (or the same Queueable execution) to
+ * avoid expiry. If you need to defer uploads, call requestUploadUrls() again
+ * just before uploading.
+ *
+ * Callout limits: every PUT to S3 counts against the per-transaction callout
+ * limit (currently 100). uploadAll() checks the remaining budget up-front and
+ * fails fast rather than dying mid-batch. For large file sets, chunk across
+ * Queueable executions.
  *
  * Exception model:
  *   S3Exception            — abstract parent; catch this for "anything from this class"

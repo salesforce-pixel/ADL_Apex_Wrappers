@@ -6,11 +6,30 @@
  * and error mapping, nothing more. Orchestration (ordering, polling, chunking)
  * belongs in a higher layer.
  *
- * Auth: uses UserInfo.getSessionId() + a Remote Site Setting for the org's
- * My Domain host. NOTE: this only works in synchronous contexts
- * (executeAnonymous, @AuraEnabled, VF controllers). It will NOT work in
- * @future, Queueable, Batch, or Scheduled Apex — those contexts return a
- * token without API access. For async, switch back to a Named Credential.
+ * Auth: callouts go through the Named Credential `ADL_NC`, which is bound to
+ * an External Credential (`ADL_EC`) configured with the OAuth 2.0 Client
+ * Credentials with Client Secret flow. The platform mints and refreshes the
+ * bearer token automatically; this class never handles tokens directly.
+ *
+ * Required org setup (see the developer guide for step-by-step):
+ *   • External Client App with Client Credentials flow enabled, configured
+ *     with a "Run As" integration user. That user is the identity the ADL
+ *     REST API sees on the server side.
+ *   • External Credential `ADL_EC` with a Principal named `Credentials`
+ *     holding the Consumer Key and Consumer Secret.
+ *   • Permission Set granting External Credential Principal Access to
+ *     `ADL_EC - Credentials`, assigned to every user who will invoke this
+ *     wrapper. This is a caller-side check; without it, token minting fails
+ *     before the HTTP call even leaves the org.
+ *   • Named Credential `ADL_NC` pointing at the org's My Domain host,
+ *     referencing `ADL_EC`, with "Generate Authorization Header" enabled.
+ *
+ * Execution context: because authentication runs through a Named Credential
+ * rather than the invoking user's session, this wrapper works in all Apex
+ * contexts — synchronous (`@AuraEnabled`, VF controllers, `executeAnonymous`)
+ * as well as asynchronous (`@future`, Queueable, Batch, Scheduled). The Apex
+ * itself still runs as the invoking user; only the HTTP callout authenticates
+ * as the Run As user from the External Client App.
  *
  * S3 file upload (Step 4 in the API flow) is NOT in this class — see
  * ADLS3Uploader. The two are intentionally separate because they target
@@ -33,6 +52,8 @@ public with sharing class ADLClient {
     // Configuration
     // ---------------------------------------------------------------------
 
+    // Retained for diagnostic use; the live request path uses `callout:ADL_NC`
+    // so the Named Credential resolves the host and injects the OAuth header.
     @TestVisible
     private static String getInstanceUrl() {
         return URL.getOrgDomainUrl().toExternalForm();
@@ -170,6 +191,10 @@ public with sharing class ADLClient {
 
     /**
      * POST /einstein/data-libraries/{libraryId}/file-upload-urls
+     *
+     * Returned URLs are short-lived (≈15 min). Mint them in the same
+     * transaction (or Queueable execution) that performs the S3 upload to
+     * avoid expiry.
      */
     public static UploadUrlsOutput requestUploadUrls(String libraryId, List<String> fileNames) {
         validateFileNames(fileNames);
@@ -197,6 +222,11 @@ public with sharing class ADLClient {
 
     /**
      * POST /einstein/data-libraries/{libraryId}/indexing
+     *
+     * Use this ONCE per library — the first time files are indexed. It
+     * transitions the library from NO_SOURCES to IN_PROGRESS and provisions
+     * the underlying vector index. For subsequent additions to an already-
+     * provisioned library, use addFiles() instead.
      */
     public static ProvisionOutput triggerIndexing(String libraryId, List<UploadedFileInfo> uploadedFiles) {
         validateUploadedFiles(uploadedFiles);
@@ -218,6 +248,11 @@ public with sharing class ADLClient {
 
     /**
      * POST /einstein/data-libraries/{libraryId}/files
+     *
+     * Appends files to a library that has already been indexed at least
+     * once. For the first-time indexing on a new library, use
+     * triggerIndexing() instead — these endpoints take the same DTO but
+     * are not interchangeable.
      */
     public static AddFilesOutput addFiles(String libraryId, List<UploadedFileInfo> uploadedFiles) {
         validateUploadedFiles(uploadedFiles);
@@ -253,6 +288,11 @@ public with sharing class ADLClient {
     // HTTP plumbing
     // ---------------------------------------------------------------------
 
+    /**
+     * All callouts route through `callout:ADL_NC`. The Named Credential
+     * resolves the host and the External Credential injects the OAuth bearer
+     * token. We never set an Authorization header ourselves.
+     */
     @TestVisible
     private static HttpResponse doCallout(String method, String path, String body) {
         HttpRequest req = new HttpRequest();
