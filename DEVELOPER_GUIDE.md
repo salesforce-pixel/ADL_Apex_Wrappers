@@ -2,6 +2,8 @@
 
 A practical guide to using the `ADLClient` and `ADLS3Uploader` Apex classes to provision and manage Agentforce Data Libraries from your own code — Queueables, scheduled jobs, Flow Invocables, REST resources, custom LWCs, or anywhere else you need to manage SFDRIVE grounding libraries programmatically.
 
+> 📘 **Official API reference:** [Agentforce Data Libraries — Connect REST API](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_adl.htm)
+
 > **API maturity:** Salesforce REST API v66.0 (Beta). Response shapes may change between versions. One known shift — the `/status` endpoint switched from a `stages` map (v66) to a `stageDetails` array (v67+) — is already handled inside the wrapper. Your Apex code reads a single normalized `stageDetails` list regardless of which API version responded.
 
 ---
