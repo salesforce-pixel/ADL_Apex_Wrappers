@@ -5,6 +5,12 @@ A Salesforce Lightning Web Component and Apex solution for managing **Agentforce
 > 📘 **Official API reference:** [Agentforce Data Libraries — Connect REST API](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_adl.htm)
 
 ---
+## Documentation
+
+- **[`README.md`](./README.md)** — Installation, org setup, console usage (this file)
+- **[`DEVELOPER_GUIDE.md`](./DEVELOPER_GUIDE.md)** — Reusing `ADLClient` and `ADLS3Uploader` in your own Apex
+
+---
 
 ## What This Solution Does
 
