@@ -91,7 +91,8 @@ External Client App  →  External Credential  →  Named Credential  →  Apex 
 ```
 
 Plus one Remote Site Setting for the S3 callouts. The eight steps below walk through each.
-![Look at the setup screenshots of External Client App, External Credential and Named Credential here for reference](./images/)
+
+- **[`Screenshots`](./images/)** — Look at the setup screenshots of External Client App, External Credential and Named Credential here for reference
 
 ### Step 1 — Create an External Client App
 
